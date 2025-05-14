@@ -1,0 +1,53 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+# load libraries
+library(dplyr)
+library(readr)
+library(janitor)
+library(stringr)
+
+
+# Importing Datasets 
+flu_dataset <-read_csv("FluView Influenza Reportings 2022-2025.csv")
+vax_dataset <- read_csv("Monthly Cumulative Influenza Vaccine Doses 2024-2025 and previous season.csv", show_col_types = FALSE)
+
+
+# Clean col names
+flu_dataset <- flu_dataset %>% 
+  clean_names()
+
+
+# Clean flu dataset to handle placeholders and make sure numerical info is used
+flu_dataset <- flu_dataset %>%
+  mutate(across(c(total_specimens, a_2009_h1n1, a_h3, a_subtyping_not_performed, b, b_vic, b_yam, h3n2v, a_h5),
+                ~ as.numeric(parse_number(replace(., . == "X", NA)))))
+
+vax_dataset <- vax_dataset %>%
+  mutate(
+    # Replace "Not Submitted" with NA and remove commas for numeric conversion
+    Numerator = as.numeric(gsub(",", "", na_if(Numerator, "Not Submitted"))),
+    Previous_season_numerator = as.numeric(gsub(",", "", na_if(Previous_season_numerator, "Not Submitted"))),
+    
+    # Ensure numeric columns are converted properly
+    `2024_25_estimate` = as.numeric(`2024_25_estimate`),
+    `Previous_Estimate` = as.numeric(`Previous_Estimate`),
+    `Difference_in_season_estimate` = as.numeric(gsub("e\\+", "e", `Difference_in_season_estimate`)),  # Handle scientific notation properly
+    Population = as.numeric(gsub(",", "", Population))
+  )
+
+
+# View data
+head(flu_dataset)
+head(vax_dataset)
+
+
+# Save cleaned version
+write_csv(flu_dataset, "cleaned_flu_dataset.csv")
+write_csv(vax_dataset, "cleaned_vax_dataset.csv")
+
+```
+
