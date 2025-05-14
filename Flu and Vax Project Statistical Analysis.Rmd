@@ -1,0 +1,441 @@
+---
+title: "Final Project Computational Analysis and Figures"
+output: word_document
+date: "2025-04-07"
+---
+
+Import Cleaned data sets
+```{r}
+# Utilizing personal paths for cleaned files
+flu_data <- read.csv(file = "cleaned_flu_dataset.csv")
+
+vax_data <-read.csv(file = "cleaned_vax_dataset_FINAL.csv")
+
+```
+
+
+Flu Data sorted by State (region in .csv file) and by Flu season (season_description in .csv file)
+
+```{r}
+# Sort flu data by state (region in .csv file), and flu season (season_description in .csv file))
+sorted_flu_data <- flu_data[order(flu_data$region, flu_data$season_description), ]
+
+# Total cases of flu data
+  # Adds up all confirmed flu sub types 
+flu_data$total_cases <- with(flu_data,
+  a_2009_h1n1 + a_h3 + a_subtyping_not_performed +
+  b + b_vic + b_yam + h3n2v + a_h5
+)
+
+# Confirms total cases column worked properly
+  # Output should display first couple of values in new column
+head(flu_data$total_cases)
+
+# Total flu cases by state and season
+state_season_totals <- aggregate(
+  cbind(total_cases, total_specimens) ~ region + season_description,
+  data = flu_data,
+  FUN = sum,
+  na.rm = TRUE # missing values won't mess up totals
+)
+
+print(head(state_season_totals))
+
+print(head(sorted_flu_data))
+
+```
+```{r}
+summary(state_season_totals)
+```
+
+```{r}
+library(writexl)
+
+write_xlsx(state_season_totals, "flu_state_and_season_totals.xlsx")
+```
+
+
+Vax Data Sorted by State and Season (2024-2025)
+
+```{r}
+# Sort vax_data by state (jurisdiction) and flu season (current_season)
+sorted_vax_data <- vax_data[order(vax_data$Jurisdiction, vax_data$Current_season), ]
+
+# Total vax cases by state and season
+vax_totals <- aggregate(
+  cbind(Numerator, Population) ~ Jurisdiction + Current_season,
+  data = sorted_vax_data,
+  FUN = sum,
+  na.rm = TRUE # missing values won't mess up totals
+)
+
+colnames(vax_totals) <- c("state", "season", "total_vaccinated", "total_population")
+
+print(head(vax_totals))
+```
+
+```{r}
+summary(vax_totals)
+```
+
+
+Vax Data Sorted by State and Season (2022-2023 & 2023-2024)
+```{r}
+sorted_prev_vax_data <- vax_data[order(vax_data$Jurisdiction, vax_data$Previous_flu_Season), ]
+
+# Get total vaccinated for each state and previous season
+prev_vax_totals <- aggregate(
+  Previous_season_numerator ~ Jurisdiction + Previous_flu_Season,
+  data = sorted_prev_vax_data,
+  FUN = sum,
+  na.rm = TRUE
+)
+
+# Rename columns for clarity
+colnames(prev_vax_totals) <- c("state", "season", "total_vaccinated_prev")
+
+
+print(head(prev_vax_totals))
+```
+
+```{r}
+summary(prev_vax_totals)
+```
+
+
+Vax Summary Stats - Current Season (2024-2025)
+
+```{r}
+# Summary statistics for current season vaccinations
+current_vax_summary <- aggregate(
+  Numerator ~ Jurisdiction + Current_season,
+  data = vax_data,
+  FUN = function(x) c(
+    total = sum(x, na.rm = TRUE),
+    average = mean(x, na.rm = TRUE),
+    median = median(x, na.rm = TRUE),
+    min = min(x, na.rm = TRUE),
+    max = max(x, na.rm = TRUE),
+    sd = sd(x, na.rm = TRUE)
+  )
+)
+
+# Flatten the summary table
+current_vax_summary <- data.frame(
+  Jurisdiction = current_vax_summary$Jurisdiction,
+  Current_season = current_vax_summary$Current_season,
+  total_vax = current_vax_summary$Numerator[, "total"],
+  avg_vax = current_vax_summary$Numerator[, "average"],
+  median_vax = current_vax_summary$Numerator[, "median"],
+  min_vax = current_vax_summary$Numerator[, "min"],
+  max_vax = current_vax_summary$Numerator[, "max"],
+  sd_vax = current_vax_summary$Numerator[, "sd"]
+)
+
+print(head(current_vax_summary)) # print first few lines
+```
+
+Send Current Season Vax Summary Stats to an Excel File for easy viewing purposes
+```{r}
+library(writexl)
+
+write_xlsx(current_vax_summary, "current_season_vax_summary.xlsx")
+```
+
+
+Vax Summary Stats - Previous Season (2022-2023 & 2023-2024)
+```{r}
+# Summary statistics for previous season vaccinations
+prev_vax_summary <- aggregate(
+  Previous_season_numerator ~ Jurisdiction + Previous_flu_Season,
+  data = vax_data,
+  FUN = function(x) c(
+    total = sum(x, na.rm = TRUE),
+    average = mean(x, na.rm = TRUE),
+    median = median(x, na.rm = TRUE),
+    min = min(x, na.rm = TRUE),
+    max = max(x, na.rm = TRUE),
+    sd = sd(x, na.rm = TRUE)
+  )
+)
+
+# Flatten the summary table
+prev_vax_summary <- data.frame(
+  Jurisdiction = prev_vax_summary$Jurisdiction,
+  Previous_flu_Season = prev_vax_summary$Previous_flu_Season,
+  total_vax_prev = prev_vax_summary$Previous_season_numerator[, "total"],
+  avg_vax_prev = prev_vax_summary$Previous_season_numerator[, "average"],
+  median_vax_prev = prev_vax_summary$Previous_season_numerator[, "median"],
+  min_vax_prev = prev_vax_summary$Previous_season_numerator[, "min"],
+  max_vax_prev = prev_vax_summary$Previous_season_numerator[, "max"],
+  sd_vax_prev = prev_vax_summary$Previous_season_numerator[, "sd"]
+)
+
+print(head(prev_vax_summary)) # print first few lines
+
+```
+
+Send Previous Season Vax Summary Stats to an Excel File for easy viewing purposes
+```{r}
+library(writexl)
+
+write_xlsx(prev_vax_summary, "previous_season_vax_summary.xlsx")
+```
+
+
+Merge the Vax and Flu totals for further analysis
+
+```{r}
+# --- Clean flu data ---
+
+# Update flu data - column names with similar information need to match
+flu_data_clean <- flu_data[flu_data$region_type == "States", ]  # keep only states
+flu_data_clean$season <- gsub("Season ", "", flu_data_clean$season_description)  # change seaso format to "202x-2x"
+flu_data_clean$state <- flu_data_clean$region  # rename region to state
+
+# Aggregate flu totals by state and season
+flu_totals <- aggregate(
+  cbind(total_specimens, a_2009_h1n1, a_h3, a_subtyping_not_performed, b, b_vic, b_yam, h3n2v, a_h5) ~ state + season,
+  data = flu_data_clean,
+  FUN = sum,
+  na.rm = TRUE
+)
+
+# Add the total flu cases column (sum of all flu strains)
+flu_totals$total_cases <- rowSums(flu_totals[, c("a_2009_h1n1", "a_h3", "a_subtyping_not_performed", "b", "b_vic", "b_yam", "h3n2v", "a_h5")], na.rm = TRUE)
+
+# --- Clean vaccination data ---
+
+# Extract 2022–23 and 2023–24 data from previous seasons
+prev_vax_data_clean <- sorted_prev_vax_data
+prev_vax_data_clean$season <- prev_vax_data_clean$Previous_flu_Season
+prev_vax_data_clean$state <- prev_vax_data_clean$Jurisdiction
+
+# Extract 2024–25 data from current season
+curr_vax_data_clean <- sorted_vax_data
+curr_vax_data_clean$season <- curr_vax_data_clean$Current_season
+curr_vax_data_clean$state <- curr_vax_data_clean$Jurisdiction
+
+# Combine both
+vax_data_clean <- rbind(
+  prev_vax_data_clean[, c("state", "season", "Numerator", "Population")],
+  curr_vax_data_clean[, c("state", "season", "Numerator", "Population")]
+)
+
+# Aggregate vaccinations
+vax_totals <- aggregate(
+  cbind(Numerator, Population) ~ state + season,
+  data = vax_data_clean,
+  FUN = sum,
+  na.rm = TRUE
+)
+
+# Calculate vaccination rate
+vax_totals$total_vaccinated <- vax_totals$Numerator
+vax_totals$total_population <- vax_totals$Population
+vax_totals$vaccination_rate <- vax_totals$total_vaccinated / vax_totals$total_population
+
+# --- Merge flu and vaccination data ---
+merged_data <- merge(
+  vax_totals[, c("state", "season", "total_vaccinated", "total_population", "vaccination_rate")],
+  flu_totals[, c("state", "season", "total_cases", "total_specimens")],
+  by = c("state", "season")
+)
+
+# Preview
+head(merged_data)
+```
+
+Send Merged Data to an Excel File for easy viewing purposes
+```{r}
+library(writexl)
+
+write_xlsx(merged_data, "merged_data.xlsx")
+```
+
+Correlation Analysis and Linear Regression 
+
+```{r}
+# Checking correlation
+cor(merged_data$vaccination_rate, merged_data$total_cases, use = "complete.obs")
+```
+```{r}
+# Value greater than 0, less than 1, suggests weak positive correlation
+# run cor.test to determine p value of this correlation
+cor.test(merged_data$vaccination_rate, merged_data$total_cases)
+```
+```{r}
+# Use ggplot() to visualize correlation
+library(ggplot2)
+ggplot(merged_data, aes(x=vaccination_rate, y=total_cases)) + geom_point() + geom_smooth(method="lm") + labs(title="Vaccination Rate vs Total Flu Cases")
+```
+```{r}
+# Setup linear regression model
+linearModel <- lm(total_cases ~ vaccination_rate, data = merged_data)
+summary(linearModel)
+```
+```{r}
+# Plot linearModel
+plot(linearModel)
+```
+```{r}
+# Generate a second linear model, this time incorporate total_population and total_specimens, to control for those factors.
+populationControlled_linearModel <- lm(total_cases ~ vaccination_rate + total_population + total_specimens, data = merged_data)
+# print summary
+summary(populationControlled_linearModel)
+```
+```{r}
+# p value is more significant.
+# plot this population controlled model.
+plot(populationControlled_linearModel)
+```
+
+
+Separate High vs. Low vaccination rates
+```{r}
+# Use median to define High vs. Low
+threshold <- median(merged_data$vaccination_rate, na.rm = TRUE)
+
+merged_data$vaccination_group <- ifelse(
+  merged_data$vaccination_rate >= threshold,
+  "High",
+  "Low"
+)
+
+```
+
+
+Hypothesis Testing - Welch's T-test
+
+```{r}
+seasons <- unique(merged_data$season)
+
+# Initialize list to store results
+t_test_results <- list()
+
+# Loop through each season and perform t-test
+for (szn in seasons) {
+  season_data <- merged_data[merged_data$season == szn, ]
+  test_result <- t.test(total_cases ~ vaccination_group, data = season_data)
+  t_test_results[[szn]] <- test_result
+  
+  cat("\nSeason:", szn, "\n")
+  print(test_result)
+}
+```
+
+
+Scatter Plot of Total Flu Cases vs Vaccination Rate
+```{r}
+# Scatter Plot
+
+# 2022-23
+plot_2022_23 <- ggplot(subset(merged_data, season == "2022-23"), aes(x = vaccination_rate, y = total_cases, color = state)) +
+  geom_point(size = 3) +
+  labs(
+    title = "Total Flu Cases vs. Vaccination Rate (2022-23)",
+    x = "Vaccination Rate",
+    y = "Total Flu Cases",
+    color = "State"
+  ) +
+  theme_minimal()
+
+# 2023-24
+plot_2023_24 <- ggplot(subset(merged_data, season == "2023-24"), aes(x = vaccination_rate, y = total_cases, color = state)) +
+  geom_point(size = 3) +
+  labs(
+    title = "Total Flu Cases vs. Vaccination Rate (2023-24)",
+    x = "Vaccination Rate",
+    y = "Total Flu Cases",
+    color = "State"
+  ) +
+  theme_minimal()
+
+# 2024-25
+plot_2024_25 <- ggplot(subset(merged_data, season == "2024-25"), aes(x = vaccination_rate, y = total_cases, color = state)) +
+  geom_point(size = 3) +
+  labs(
+    title = "Total Flu Cases vs. Vaccination Rate (2024-25)",
+    x = "Vaccination Rate",
+    y = "Total Flu Cases",
+    color = "State"
+  ) +
+  theme_minimal()
+
+plot_2022_23
+plot_2023_24
+plot_2024_25
+```
+
+Scatter Plots with regression lines for High v Low vaccination groups
+```{r}
+# Scatter plot with regression lines for High vs. Low vaccination groups
+library(ggplot2)
+
+ggplot(merged_data, aes(x = vaccination_rate, y = total_cases, color = vaccination_group)) +
+  geom_point(size = 3) +  # Scatter points
+  geom_smooth(method = "lm", aes(group = vaccination_group), se = FALSE) +  # Regression lines
+  labs(
+    title = "Total Flu Cases vs. Vaccination Rate (High vs. Low Vaccination Groups)",
+    x = "Vaccination Rate",
+    y = "Total Flu Cases",
+    color = "Vaccination Group"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+```{r}
+high_model <- lm(total_cases ~ vaccination_rate, data = subset(merged_data, vaccination_group == "High"))
+low_model <- lm(total_cases ~ vaccination_rate, data = subset(merged_data, vaccination_group == "Low"))
+
+# Extract and print slopes (coefficients for vaccination_rate)
+high_slope <- coef(high_model)[["vaccination_rate"]]
+low_slope <- coef(low_model)[["vaccination_rate"]]
+
+cat("Slope for High vaccination group:", round(high_slope, 2), "\n")
+cat("Slope for Low vaccination group:", round(low_slope, 2), "\n")
+```
+
+```{r}
+# Scatter plot with regression lines for High vs. Low vaccination groups
+# Create plots for each season
+seasons <- unique(merged_data$season)
+
+for (s in seasons) {
+  season_data <- subset(merged_data, season == s)
+  
+  p <- ggplot(season_data, aes(x = vaccination_rate, y = total_cases, color = vaccination_group)) +
+    geom_point(size = 3) +
+    geom_smooth(method = "lm", aes(group = vaccination_group), se = FALSE) +
+    labs(
+      title = paste("Flu Cases vs. Vaccination Rate - Season:", s),
+      x = "Vaccination Rate",
+      y = "Total Flu Cases",
+      color = "Vaccination Group"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "top")
+  
+  print(p)
+}
+```
+
+```{r}
+
+for (s in seasons) {
+  season_data <- subset(merged_data, season == s)
+  
+  cat("\nSeason:", s, "\n")
+  
+  for (group in c("High", "Low")) {
+    group_data <- subset(season_data, vaccination_group == group)
+    model <- lm(total_cases ~ vaccination_rate, data = group_data)
+    slope <- coef(model)[["vaccination_rate"]]
+    cat("  Slope for", group, "vaccination group:", round(slope, 2), "\n")
+  }
+}
+```
+
+
+
